@@ -1,0 +1,51 @@
+import librosa
+import numpy as np
+from collections import Counter
+#from mido import Message, MidiFile, MidiTrack
+
+# Charger un fichier audio
+y, sr = librosa.load('H:/Documents/ING2/traitement de signal/Niveau 1 - Bach flute.wav')
+
+# Détection des débuts (onsets) en temps
+onset_frames = librosa.onset.onset_detect(y=y, sr=sr, hop_length=512, units='frames')
+onset_times = librosa.frames_to_time(onset_frames, sr=sr)
+
+# Ajouter un point final pour couvrir le dernier segment
+onset_times = np.append(onset_times, librosa.get_duration(y=y, sr=sr))
+
+# Liste pour stocker les notes détectées
+detected_notes = []
+
+# Diviser et analyser chaque segment
+for i in range(len(onset_times) - 1):
+    start_time = onset_times[i]
+    end_time = onset_times[i + 1]
+    
+    # Convertir le temps en échantillons
+    start_sample = int(start_time * sr)
+    end_sample = int(end_time * sr)
+    
+    # Extraire le segment audio
+    segment = y[start_sample:end_sample]
+    
+    # Détection de la fréquence dominante avec librosa.piptrack
+    pitches, magnitudes = librosa.piptrack(y=segment, sr=sr)
+    notes_in_segment = []
+    
+    if pitches.any():
+        for t in range(pitches.shape[1]):  # Parcourir chaque frame
+            index = magnitudes[:, t].argmax()  # Index de la magnitude maximale
+            pitch_candidate = pitches[index, t]
+            if pitch_candidate > 0:  # Vérifier que la fréquence est valide
+                note = librosa.hz_to_note(pitch_candidate)
+                notes_in_segment.append(note)
+    
+    # Trouver la note la plus fréquente dans ce segment
+    if notes_in_segment:
+        most_common_note = Counter(notes_in_segment).most_common(1)[0][0]
+        if not detected_notes or detected_notes[-1][0] != most_common_note:
+            detected_notes.append((most_common_note, start_time, end_time))
+
+#print(detected_notes)
+for note, start, end in detected_notes:
+    print(f"Note: {note}, Start: {start:.2f}s, End: {end:.2f}s")

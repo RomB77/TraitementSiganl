@@ -1,0 +1,117 @@
+import librosa
+import numpy as np
+import matplotlib.pyplot as plt
+from midiutil import MIDIFile             #http://midiutil.readthedocs.io/en/1.2.1/
+from collections import Counter
+#from mido import Message, MidiFile, MidiTrack
+
+# Charger un fichier audio
+y, sr = librosa.load('son/01 - So What-10.wav')
+
+# Adapter les paramètres en fonction du tempo
+nfft = 2048 # Si le tempo est rapide (arbitrairement au-dessus de 120 BPM) on réduire la taille de la fenêtre pour une meilleure résolution temporelle
+hop_length = int(nfft * 0.5) 
+
+# Calcul du spectrogramme
+D = librosa.stft(y, n_fft=nfft, hop_length=hop_length)
+S_db = librosa.amplitude_to_db(np.abs(D), ref=np.max)
+
+# Affichage du spectrogramme
+plt.figure(figsize=(10, 6))
+librosa.display.specshow(S_db, sr=sr, hop_length=hop_length, x_axis='time', y_axis='hz')
+plt.colorbar(format='%+2.0f dB')
+plt.title('Spectrogramme')
+#plt.show()
+h
+# Détection des débuts (onsets) en temps
+onset_frames = librosa.onset.onset_detect(y=y, sr=sr, hop_length=512, units='frames')
+onset_times = librosa.frames_to_time(onset_frames, sr=sr)
+
+# Ajouter un point final pour couvrir le dernier segment
+onset_times = np.append(onset_times, librosa.get_duration(y=y, sr=sr))
+
+# Liste pour stocker les notes détectées
+detected_notes = []
+
+def note_to_midi(note_name):
+    # Liste des noms des notes
+    note_base = {'C': 0, 'C♯': 1, 'D': 2, 'D♯': 3, 'E': 4, 'F': 5, 'F♯': 6, 
+                 'G': 7, 'G♯': 8, 'A': 9, 'A♯': 10, 'B': 11}
+    
+    # Extraction de la note et de l'octave
+    note = note_name[:-1]  # Partie lettre (e.g., 'C', 'D#')
+    octave = int(note_name[-1])  # Partie chiffre (e.g., 4)
+    
+    # Calcul du numéro MIDI
+    midi_number = 12 * (octave + 1) + note_base[note]
+    return midi_number
+
+def octave(note_prec, note_suiv) :
+    if len(note_prec) == 2 and len(note_suiv) == 2 :
+        if note_prec[0] == note_suiv[0] :
+            return False
+    if len(note_prec) == 3 and len(note_suiv) == 3 :
+        if note_prec[:2] == note_suiv[:2] :
+            return False
+    else :
+        return True
+
+# Diviser et analyser chaque segment
+for i in range(len(onset_times) - 1):
+    start_time = onset_times[i]
+    end_time = onset_times[i + 1]
+    
+    # Convertir le temps en échantillons
+    start_sample = int(start_time * sr)
+    end_sample = int(end_time * sr)
+    
+    duree_time = end_time - start_time
+
+    # Extraire le segment audio
+    segment = y[start_sample:end_sample]
+    
+    # Détection de la fréquence dominante avec librosa.piptrack
+    pitches, magnitudes = librosa.piptrack(y=segment, sr=sr)
+    notes_in_segment = []
+    
+    if pitches.any():
+        for t in range(pitches.shape[1]):  # Parcourir chaque frame
+            index = magnitudes[:, t].argmax()  # Index de la magnitude maximale
+            pitch_candidate = pitches[index, t]
+            if pitch_candidate > 0:  # Vérifier que la fréquence est valide
+                note = librosa.hz_to_note(pitch_candidate)
+                notes_in_segment.append(note)
+
+    # Trouver la note la plus fréquente dans ce segment
+    if notes_in_segment :
+        most_common_note = Counter(notes_in_segment).most_common(1)[0][0]
+        if (not detected_notes) or octave(detected_notes[-1][0],most_common_note) :
+            midi_note = note_to_midi(most_common_note)
+            detected_notes.append((most_common_note, start_time, end_time,pitch_candidate,duree_time,midi_note))
+
+"""
+#print(detected_notes)
+for note, start, end, freq in detected_notes:
+    print(f"Note: {note}, Fréquence : {freq}, Start: {start:.2f}s, End: {end:.2f}s")
+"""
+
+# Sauvegarder le fichier MIDI
+track = 0
+channel = 0
+volume = 100  # 0-127, selon la norme MIDI
+
+# Création du fichier MIDI
+midi = MIDIFile(1)
+program = 0
+midi.addProgramChange(track, channel, 0, program)
+
+# Ajout des notes au fichier MIDI
+for i, (note_name, start,end, freq,duree,midi_note) in enumerate(detected_notes): # frame = duree
+    if i < len(detected_notes) - 1 :
+        duree = detected_notes[i+1][1] - detected_notes[i][1]
+    midi.addNote(track, channel, midi_note, start*2, duree*2, 100)  # Canal 0, vélocité 100
+
+# Écriture du fichier MIDI
+with open("output_notes.mid", "wb") as output_file:
+    midi.writeFile(output_file)
+

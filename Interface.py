@@ -1,12 +1,151 @@
 ##Librairies
 import tkinter as tk
-from tkinter import filedialog, Toplevel
+from tkinter import filedialog, Toplevel,ttk
 import pygame
 import librosa
+import librosa.display
 import numpy as np
 import matplotlib.pyplot as plt
 from midiutil import MIDIFile
 from collections import Counter
+import pandas as pd
+import os
+import random
+from pydub import AudioSegment
+from pydub.playback import play
+import tempfile
+
+## Dictionnaire des instruments
+instruments= {
+    'Piano': 0,
+    'Piano Clair': 1,
+    'Piano Électrique': 2,
+    'Piano Honky-tonk': 3,
+    'Clavier Électrique 1': 4,
+    'Clavier Électrique 2': 5,
+    'Clavecin': 6,
+    'Clavinet': 7,
+    'Célesta': 8,
+    'Carillon': 9,
+    'Boîte à Musique': 10,
+    'Vibraphone': 11,
+    'Marimba': 12,
+    'Xylophone': 13,
+    'Cloches Tubulaires': 14,
+    'Dulcimer': 15,
+    'Orgue Classique': 16,
+    'Orgue Percussif': 17,
+    'Orgue Rock': 18,
+    'Orgue d’Église': 19,
+    'Harmonium': 20,
+    'Accordéon': 21,
+    'Harmonica': 22,
+    'Accordéon Tango': 23,
+    'Guitare Classique': 24,
+    'Guitare Acoustique': 25,
+    'Guitare Jazz': 26,
+    'Guitare Clean': 27,
+    'Guitare Mutée': 28,
+    'Guitare Saturée': 29,
+    'Guitare Distorsion': 30,
+    'Harmoniques Guitare': 31,
+    'Contrebasse Acoustique': 32,
+    'Basse Électrique (Doigt)': 33,
+    'Basse Électrique (Médiator)': 34,
+    'Basse Fretless': 35,
+    'Basse Slap 1': 36,
+    'Basse Slap 2': 37,
+    'Basse Synth 1': 38,
+    'Basse Synth 2': 39,
+    'Violons': 40,
+    'Alto': 41,
+    'Violoncelle': 42,
+    'Contrebasse': 43,
+    'Cordes Tremolo': 44,
+    'Cordes Pizzicato': 45,
+    'Harpe': 46,
+    'Timbales': 47,
+    'Ensemble à Cordes 1': 48,
+    'Ensemble à Cordes 2': 49,
+    'Cordes Synth 1': 50,
+    'Cordes Synth 2': 51,
+    'Chœur Aahs': 52,
+    'Chœur Oohs': 53,
+    'Chœur Synthétique': 54,
+    'Coup d’Orchestre': 55,
+    'Trompette': 56,
+    'Trombone': 57,
+    'Tuba': 58,
+    'Trompette Sourdine': 59,
+    'Cor': 60,
+    'Section Cuivres': 61,
+    'Cuivres Synth 1': 62,
+    'Cuivres Synth 2': 63,
+    'Saxophone Soprano': 64,
+    'Saxophone Alto': 65,
+    'Saxophone Ténor': 66,
+    'Saxophone Baryton': 67,
+    'Hautbois': 68,
+    'Cor Anglais': 69,
+    'Basson': 70,
+    'Clarinette': 71,
+    'Piccolo': 72,
+    'Flûte': 73,
+    'Flûte à Bec': 74,
+    'Flûte de Pan': 75,
+    'Bouteille Soufflée': 76,
+    'Shakuhachi': 77,
+    'Sifflet': 78,
+    'Ocarina': 79,
+    'Lead (Carré)': 80,
+    'Lead (Dent de Scie)': 81,
+    'Lead (Calliope)': 82,
+    'Lead (Chiff)': 83,
+    'Lead (Charang)': 84,
+    'Lead (Voix)': 85,
+    'Lead (Quintes)': 86,
+    'Lead (Basse + Lead)': 87,
+    'Pad (New Age)': 88,
+    'Pad (Chaleureux)': 89,
+    'Pad (Polysynth)': 90,
+    'Pad (Chœur)': 91,
+    'Pad (Archet)': 92,
+    'Pad (Métallique)': 93,
+    'Pad (Halo)': 94,
+    'Pad (Balayage)': 95,
+    'FX (Pluie)': 96,
+    'FX (Bande Son)': 97,
+    'FX (Cristal)': 98,
+    'FX (Atmosphère)': 99,
+    'FX (Éclat)': 100,
+    'FX (Gobelins)': 101,
+    'FX (Échos)': 102,
+    'FX (Science-Fiction)': 103,
+    'Sitar': 104,
+    'Banjo': 105,
+    'Shamisen': 106,
+    'Koto': 107,
+    'Kalimba': 108,
+    'Cornemuse': 109,
+    'Violon Fiddle': 110,
+    'Shanai': 111,
+    'Clochettes': 112,
+    'Agogo': 113,
+    'Tambours Métalliques': 114,
+    'Blocs de Bois': 115,
+    'Tambour Taiko': 116,
+    'Tom Mélodique': 117,
+    'Tambour Synthétique': 118,
+    'Cymbale Inversée': 119,
+    'Bruit de Guitare': 120,
+    'Bruit de Souffle': 121,
+    'Bruit de Vagues': 122,
+    'Chant d’Oiseaux': 123,
+    'Sonnerie Téléphone': 124,
+    'Hélicoptère': 125,
+    'Applaudissements': 126,
+    'Coup de Feu': 127
+}
 
 ## Fenêtre de résultat
 
@@ -124,138 +263,7 @@ def result(audio,instru):
 
 # Fonction pour ouvrir une nouvelle fenêtrequi joue le résultat
 def changer_instrument():
-    instrument = champ_instrument.get()
-    instruments= {
-        'Piano': 0,
-        'Piano Clair': 1,
-        'Piano Électrique': 2,
-        'Piano Honky-tonk': 3,
-        'Clavier Électrique 1': 4,
-        'Clavier Électrique 2': 5,
-        'Clavecin': 6,
-        'Clavinet': 7,
-        'Célesta': 8,
-        'Carillon': 9,
-        'Boîte à Musique': 10,
-        'Vibraphone': 11,
-        'Marimba': 12,
-        'Xylophone': 13,
-        'Cloches Tubulaires': 14,
-        'Dulcimer': 15,
-        'Orgue Classique': 16,
-        'Orgue Percussif': 17,
-        'Orgue Rock': 18,
-        'Orgue d’Église': 19,
-        'Harmonium': 20,
-        'Accordéon': 21,
-        'Harmonica': 22,
-        'Accordéon Tango': 23,
-        'Guitare Classique': 24,
-        'Guitare Acoustique': 25,
-        'Guitare Jazz': 26,
-        'Guitare Clean': 27,
-        'Guitare Mutée': 28,
-        'Guitare Saturée': 29,
-        'Guitare Distorsion': 30,
-        'Harmoniques Guitare': 31,
-        'Contrebasse Acoustique': 32,
-        'Basse Électrique (Doigt)': 33,
-        'Basse Électrique (Médiator)': 34,
-        'Basse Fretless': 35,
-        'Basse Slap 1': 36,
-        'Basse Slap 2': 37,
-        'Basse Synth 1': 38,
-        'Basse Synth 2': 39,
-        'Violons': 40,
-        'Alto': 41,
-        'Violoncelle': 42,
-        'Contrebasse': 43,
-        'Cordes Tremolo': 44,
-        'Cordes Pizzicato': 45,
-        'Harpe': 46,
-        'Timbales': 47,
-        'Ensemble à Cordes 1': 48,
-        'Ensemble à Cordes 2': 49,
-        'Cordes Synth 1': 50,
-        'Cordes Synth 2': 51,
-        'Chœur Aahs': 52,
-        'Chœur Oohs': 53,
-        'Chœur Synthétique': 54,
-        'Coup d’Orchestre': 55,
-        'Trompette': 56,
-        'Trombone': 57,
-        'Tuba': 58,
-        'Trompette Sourdine': 59,
-        'Cor': 60,
-        'Section Cuivres': 61,
-        'Cuivres Synth 1': 62,
-        'Cuivres Synth 2': 63,
-        'Saxophone Soprano': 64,
-        'Saxophone Alto': 65,
-        'Saxophone Ténor': 66,
-        'Saxophone Baryton': 67,
-        'Hautbois': 68,
-        'Cor Anglais': 69,
-        'Basson': 70,
-        'Clarinette': 71,
-        'Piccolo': 72,
-        'Flûte': 73,
-        'Flûte à Bec': 74,
-        'Flûte de Pan': 75,
-        'Bouteille Soufflée': 76,
-        'Shakuhachi': 77,
-        'Sifflet': 78,
-        'Ocarina': 79,
-        'Lead (Carré)': 80,
-        'Lead (Dent de Scie)': 81,
-        'Lead (Calliope)': 82,
-        'Lead (Chiff)': 83,
-        'Lead (Charang)': 84,
-        'Lead (Voix)': 85,
-        'Lead (Quintes)': 86,
-        'Lead (Basse + Lead)': 87,
-        'Pad (New Age)': 88,
-        'Pad (Chaleureux)': 89,
-        'Pad (Polysynth)': 90,
-        'Pad (Chœur)': 91,
-        'Pad (Archet)': 92,
-        'Pad (Métallique)': 93,
-        'Pad (Halo)': 94,
-        'Pad (Balayage)': 95,
-        'FX (Pluie)': 96,
-        'FX (Bande Son)': 97,
-        'FX (Cristal)': 98,
-        'FX (Atmosphère)': 99,
-        'FX (Éclat)': 100,
-        'FX (Gobelins)': 101,
-        'FX (Échos)': 102,
-        'FX (Science-Fiction)': 103,
-        'Sitar': 104,
-        'Banjo': 105,
-        'Shamisen': 106,
-        'Koto': 107,
-        'Kalimba': 108,
-        'Cornemuse': 109,
-        'Violon Fiddle': 110,
-        'Shanai': 111,
-        'Clochettes': 112,
-        'Agogo': 113,
-        'Tambours Métalliques': 114,
-        'Blocs de Bois': 115,
-        'Tambour Taiko': 116,
-        'Tom Mélodique': 117,
-        'Tambour Synthétique': 118,
-        'Cymbale Inversée': 119,
-        'Bruit de Guitare': 120,
-        'Bruit de Souffle': 121,
-        'Bruit de Vagues': 122,
-        'Chant d’Oiseaux': 123,
-        'Sonnerie Téléphone': 124,
-        'Hélicoptère': 125,
-        'Applaudissements': 126,
-        'Coup de Feu': 127
-    }
-
+    instrument = instrument_combobox.get()
 
     if instrument in instruments:
         try:
@@ -270,8 +278,17 @@ def changer_instrument():
             nouvelle_fenetre.title(f"Changer pour l'instrument : {instrument}")
             nouvelle_fenetre.geometry("600x300")  # Définir la taille de la fenêtre principale
 
+            # Gestionnaire pour quitter proprement l'application
+            def quitter_application():
+                pygame.mixer.music.stop()  # Arrêter la lecture en cours (si nécessaire)
+                pygame.mixer.quit()        # Libérer les ressources de pygame
+                nouvelle_fenetre.destroy()          # Fermer la fenêtre principale
+
+            # Associer l'événement de fermeture de la fenêtre au gestionnaire
+            nouvelle_fenetre.protocol("WM_DELETE_WINDOW", quitter_application)
+
             # Titre et information dans la fenêtre
-            tk.Label(nouvelle_fenetre, text=f"{audio_choisi.split('.')[0]} joué par un/une {instrument}").pack(pady=10)
+            tk.Label(nouvelle_fenetre, text=f"{nom_audio} joué par un/une {instrument}").pack(pady=10)
 
             # Ajouter les boutons de contrôle audio
             tk.Button(nouvelle_fenetre, text="Jouer", command=lambda: pygame.mixer.music.play()).pack(pady=5)
@@ -294,20 +311,43 @@ audio_choisi = None
 
 def choisir_fichier():
     global audio_choisi  # Déclarer la variable globale
+    global nom_audio
     audio_choisi = filedialog.askopenfilename(
         title="Choisir un fichier audio",
-        filetypes=[("Fichiers audio", "*.mp3 *.wav *.mid")]
+        filetypes=[("Fichiers audio", " *.wav")]
     )
     sep=audio_choisi.split('/')
-    audio_choisi=sep[len(sep)-1]
+    nom_audio=sep[len(sep)-1]
     if audio_choisi:
-        label_fichier.config(text=f"Audio sélectionné : {audio_choisi}")
+        label_fichier.config(text=f"Audio sélectionné : {nom_audio}")
         try:
             pygame.mixer.music.load(audio_choisi)
         except pygame.error as e:
             label_fichier.config(text=f"Erreur de chargement : {e}")
     else:
         label_fichier.config(text="Aucun fichier sélectionné")
+
+
+def fichier_aleat():
+    global audio_choisi  # Variable pour stocker le fichier sélectionné
+    global nom_audio
+    repertoire = filedialog.askdirectory(title="Choisir un répertoire")  # Sélection du répertoire
+    if repertoire:
+        # Récupérer tous les fichiers audio (.mp3, .wav, .mid) dans le répertoire
+        fichiers_audio = [f for f in os.listdir(repertoire) if f.endswith(('.wav'))]
+        if fichiers_audio:
+            audio_choisi = os.path.join(repertoire, random.choice(fichiers_audio))  # Fichier aléatoire
+            sep=audio_choisi.split('\\')
+            nom_audio=sep[len(sep)-1]
+            label_fichier.config(text=f"Fichier sélectionné : {nom_audio}")
+            try:
+                pygame.mixer.music.load(audio_choisi)  # Charger le fichier audio
+            except pygame.error as e:
+                label_fichier.config(text=f"Erreur de chargement : {e}")
+        else:
+            label_fichier.config(text="Aucun fichier audio trouvé dans ce répertoire.")
+    else:
+        label_fichier.config(text="Aucun répertoire sélectionné.")
 
 
 # Fonction pour jouer le fichier audio
@@ -343,8 +383,25 @@ fenetre = tk.Tk()
 fenetre.title("Lecteur Audio")
 fenetre.geometry("600x500")  # Définir la taille de la fenêtre principale
 
+# Gestionnaire pour quitter proprement l'application
+def quitter_application():
+    fenetre.destroy()          # Fermer la fenêtre principale
+    exit()
+
+# Associer l'événement de fermeture de la fenêtre au gestionnaire
+fenetre.protocol("WM_DELETE_WINDOW", quitter_application)
+
+
 # Bouton pour sélectionner un fichier
 bouton_choisir = tk.Button(fenetre, text="Choisir un fichier audio", command=choisir_fichier)
+bouton_choisir.pack(pady=10)
+
+# Label pour afficher le nom du fichier sélectionné
+label_fichier = tk.Label(fenetre, text="ou", wraplength=400)
+label_fichier.pack(pady=10)
+
+# Bouton pour sélectionner un fichier
+bouton_choisir = tk.Button(fenetre, text="Sélectionner un audio aléatoire", command=fichier_aleat)
 bouton_choisir.pack(pady=10)
 
 # Label pour afficher le nom du fichier sélectionné
@@ -365,12 +422,17 @@ bouton_arreter = tk.Button(fenetre, text="Arrêter", command=arreter_audio)
 bouton_arreter.pack(pady=5)
 
 # Texte déplacé sous les boutons de contrôle
-label_instrument = tk.Label(fenetre, text="Écrire l'instrument pour changer le son :")
+label_instrument = tk.Label(fenetre, text="Choisir l'instrument pour changer le son :")
 label_instrument.pack(padx=5, pady=10)  # Ajoute un espace avec pady
 
 # Champ de texte pour entrer un instrument
-champ_instrument = tk.Entry(fenetre, width=30)
-champ_instrument.pack(padx=10, pady=5)
+
+instruments_list = list(instruments.keys())
+instrument_combobox = tk.ttk.Combobox(fenetre, values=instruments_list, state="readonly")
+instrument_combobox.pack(padx=10, pady=5)
+
+# Définir une valeur par défaut pour la combobox
+instrument_combobox.set("Piano")
 
 label_instrument_erreur = tk.Label(fenetre, text="", fg="red")
 label_instrument_erreur.pack()
@@ -381,5 +443,7 @@ bouton_changer.pack(pady=10)
 
 # Boucle principale de l'interface graphique
 fenetre.mainloop()
+
+
 
 
